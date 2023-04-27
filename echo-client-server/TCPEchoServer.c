@@ -14,20 +14,28 @@ int main(int argc, char *argv[]) {
   if (servSock < 0)
     DieWithUserMessage("SetupTCPServerSocket() failed", service);
 
+  //buffer 
+  char buff[MAX];
+  int n;
+
   for (;;) { // Run forever
     // New connection creates a connected client socket
     int clntSock = AcceptTCPConnection(servSock);
 
     HandleTCPClient(clntSock); // Process client
     
+    //erases memory from previous commands
+    //buffer 
     bzero(buff, MAX);
    
     // read the message from client and copy it in buffer
     read(connfd, buff, sizeof(buff));
+
     // print buffer which contains the client contents
     printf("From client: %s\t To client : ", buff);
     bzero(buff, MAX);
     n = 0;
+    
     // copy server message in the buffer
     while ((buff[n++] = getchar()) != '\n')
       ;
