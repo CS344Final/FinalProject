@@ -15,9 +15,11 @@ int main(int argc, char *argv[]) {
     DieWithUserMessage("SetupTCPServerSocket() failed", service);
 
   talk(connfd)
-
+  close(clntSock);
 }
 
+
+//ryan made this function
 void talk(int connfd)
 {
 
