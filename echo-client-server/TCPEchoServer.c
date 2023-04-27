@@ -14,7 +14,14 @@ int main(int argc, char *argv[]) {
   if (servSock < 0)
     DieWithUserMessage("SetupTCPServerSocket() failed", service);
 
-  //buffer 
+  talk(connfd)
+
+}
+
+void talk(int connfd)
+{
+
+    //buffer 
   char buff[MAX];
   int n;
 
@@ -53,4 +60,5 @@ int main(int argc, char *argv[]) {
   }
   // NOT REACHED
   close(servSock);
+
 }
