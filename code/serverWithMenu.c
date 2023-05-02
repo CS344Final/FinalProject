@@ -8,16 +8,16 @@
 #define MAXPENDING 5    /* Maximum outstanding connection requests */
 
 void DieWithError(char *errorMessage);  /* Error handling function */
-void HandleTCPClient(int clntSocket);   /* TCP client handling function */
+void HandleTCPClient(int clientSocket);   /* TCP client handling function */
 
 int main(int argc, char *argv[])
 {
     int servSock;                    /* Socket descriptor for server */
-    int clntSock;                    /* Socket descriptor for client */
+    int clientSock;                    /* Socket descriptor for client */
     struct sockaddr_in echoServAddr; /* Local address */
-    struct sockaddr_in echoClntAddr; /* Client address */
+    struct sockaddr_in echoClientAddr; /* Client address */
     unsigned short echoServPort;     /* Server port */
-    unsigned int clntLen;            /* Length of client address data structure */
+    unsigned int clientLen;            /* Length of client address data structure */
 
     if (argc != 2)     /* Test for correct number of arguments */
     {
@@ -48,18 +48,18 @@ int main(int argc, char *argv[])
     for (;;) /* Run forever */
     {
         /* Set the size of the in-out parameter */
-        clntLen = sizeof(echoClntAddr);
+        clientLen = sizeof(echoClientAddr);
 
         /* Wait for a client to connect */
-        if ((clntSock = accept(servSock, (struct sockaddr *) &echoClntAddr, 
-                               &clntLen)) < 0)
+        if ((clientSock = accept(servSock, (struct sockaddr *) &echoClientAddr, 
+                               &clientLen)) < 0)
             DieWithError("accept() failed");
 
-        /* clntSock is connected to a client! */
+        /* clientSock is connected to a client! */
 
-        printf("Handling client %s\n", inet_ntoa(echoClntAddr.sin_addr));
+        printf("Handling client %s\n", inet_ntoa(echoClientAddr.sin_addr));
 
-        HandleTCPClient(clntSock);
+        HandleTCPClient(clientSock);
     }
     /* NOT REACHED */
 }

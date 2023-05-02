@@ -25,3 +25,4 @@ void put(int sock, void *buffer, unsigned int bufferSize)
             DieWithError("send() failed");
         totalBytesSent += bytesSent;
     }
+}
