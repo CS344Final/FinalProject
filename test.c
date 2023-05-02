@@ -65,6 +65,28 @@ void handleClient(int clientSock)
 
         case 2:
             // Select file
+            // (not finished)
+            // put(clientSock, "What file would you like to reach?\n", strlen("What file would you like to reach?"\n))
+            // get(clientSock, )
+
+            // Ask for directory
+            // ?!!??!?!!?!
+
+
+            // Change to the desired directory
+            sprintf(buffer, "CWD %s\r\n", directory);
+            write(sockfd, buffer, strlen(buffer));
+            bzero(buffer, sizeof(buffer));
+            read(sockfd, buffer, sizeof(buffer));
+            printf("%s", buffer);
+
+            // Get a list of files in the directory
+            sprintf(buffer, "NLST\r\n");
+            write(sockfd, buffer, strlen(buffer));
+            bzero(buffer, sizeof(buffer));
+
+
+
             // ...
             if (fileExists)
             {
