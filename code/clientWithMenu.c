@@ -6,7 +6,7 @@
 #include <unistd.h>     /* for close() */
 
 #define RCVBUFSIZE 100   /* Size of receive buffer */
-#define NAME_SIZE 21 /*Includes room for null */
+#define NAME_SIZE 255 /*Includes room for null */
 
 typedef struct{
   unsigned int x;
@@ -20,9 +20,9 @@ typedef struct{
 }DATA_TYPE;
 
 struct menu{
-  unsigned char line1[20];
-  unsigned char line2[20];
-  unsigned char line3[20];
+  unsigned char line1[30];
+  unsigned char line2[30];
+  unsigned char line3[30];
 };
 
 void DieWithError(char *errorMessage);  /* Error handling function */
@@ -30,8 +30,8 @@ void get(int, void *, unsigned int);
 void put(int, void *, unsigned int);
 void talkToServer(int);
 unsigned int displayMenuAndSendSelection(int);
-void sendName(int);
-void sendNumber(int);
+void sendDirName(int);
+void sendFilename(int);
 
 int main(int argc, char *argv[])
 {
@@ -95,12 +95,12 @@ void talkToServer(int sock)
         selection = displayMenuAndSendSelection(sock);
         printf("Client selected: %d\n", selection);
         switch(selection)
-        {
+        {   //we need to change sendName() and sendNumber()
             case 1:
-                sendName(sock);
+                sendDirName(sock);
                 break;
             case 2:
-                sendNumber(sock);
+                sendFilename(sock);
                 break;
             }
         if(selection == 3) break;
@@ -130,29 +130,29 @@ unsigned int displayMenuAndSendSelection(int sock)
     return response;
 }
 
-void sendName(int sock)
+void sendDirName(int sock)
 {
-    unsigned char msg[21];
-    unsigned char name[NAME_SIZE];
+    unsigned char msg[255];
+    unsigned char dirname[NAME_SIZE];
 
     memset(msg, 0, sizeof(msg));
     get(sock, msg, sizeof(msg));
     printf("%s\n", msg);
-    memset(name, 0, NAME_SIZE);
-    fgets(name, NAME_SIZE, stdin);
-    put(sock, name, NAME_SIZE);
+    memset(dirname, 0, NAME_SIZE);
+    fgets(dirname, NAME_SIZE, stdin);
+    put(sock, dirname, NAME_SIZE);
 }
 
-void sendNumber(int sock)
+void sendFilename(int sock)
 {
-    unsigned char msg[21];
-    int number;
+    unsigned char msg[255];
+    int filename;
 
     memset(msg, 0, sizeof(msg));
     get(sock, msg, sizeof(msg));
     printf("%s\n", msg);
-    scanf("%d", &number);
-    number = htonl(number);
-    put(sock, &number, sizeof(int));
+    scanf("%d", &filename);
+    filename = htonl(filename);
+    put(sock, &filename, sizeof(int));
 }
 

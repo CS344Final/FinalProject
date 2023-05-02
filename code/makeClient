@@ -4,3 +4,5 @@ getPut.o:	getPut.c
 	gcc -c getPut.c
 DieWithError.o:		DieWithError.c
 	gcc -c DieWithError.c
+clean:
+	rm -f *.o
