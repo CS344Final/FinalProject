@@ -10,6 +10,7 @@
 
 #define RCVBUFSIZE 32   /* Size of receive buffer */
 #define NAME_SIZE 255 /*Includes room for null */
+#define DIR_SIZE 9000
 
 struct menu{
   unsigned char line1[30];
@@ -27,6 +28,8 @@ void getDirectoryName(int, char *);
 void directoryListing(int, char *);
 void getFileName(int, char *);
 void sendFile(int, char *);
+void sendFileSize(int, char *);
+void awaitConfirmation(int);
 
 //this function is done
 void HandleTCPClient(int clntSocket)
@@ -38,18 +41,19 @@ void HandleTCPClient(int clntSocket)
     unsigned char bye[] = "Bye!";
     unsigned char fileName[NAME_SIZE];  
 
-    response = sendMenuAndWaitForResponse(clntSocket);
+    response = sendMenuAndWaitForResponse(clntSocket);      //send + receive input
     while(response != 3)
     {
         switch(response)
         {
             case 1: printf("Client selected 1.\n");
-                    getDirectoryName(clntSocket,directoryName);
-                    directoryListing(clntSocket, directoryName); 
+                    getDirectoryName(clntSocket,directoryName);     //send + receive input
+                    directoryListing(clntSocket, directoryName);    //send + receive confirm
                     break;
             case 2: printf("Client selected 2.\n");
-                    getFileName(clntSocket,fileName);
-                    sendFile(clntSocket,fileName);
+                    getFileName(clntSocket,fileName);               //send + receive input
+                    sendFileSize(clntSocket, fileName);             //send + receive confirm
+                    sendFile(clntSocket,fileName);                  //send + receive confirm
                     break;
             default: printf("Client selected junk.\n"); put(clntSocket, errorMsg, sizeof(errorMsg)); break;
         }
@@ -92,47 +96,33 @@ void directoryListing(int sock, char *dirname) {
     printf("Attempting to list directory\n");
     struct stat mystat, *sp = &mystat;
     int r;
-    char path[1024], cwd[1024], msg[4096];
-    *msg = "";
+    char path[1024], cwd[1024];
+    unsigned char msg[DIR_SIZE];
+    strcpy(msg,"\0");
 
-	strcpy(path, dirname);
-	if (path[0] != '/') {// filename is relative
-		getcwd(cwd, 1024);
-		strcpy(path, cwd);
-		strcat(path, "/");
-		strcat(path, dirname);
-	}
-    printf("path accquired: %s\n", path);
     DIR *dp;
-	struct dirent *dirp;
-	dp = opendir(dirname);
-	char dnamecpy[1024];
-	while ((dirp = readdir(dp)) != NULL) {
-		strcpy(dnamecpy, dirname);
-		strcat(dnamecpy, "/");
-		strcat(dnamecpy, dirp->d_name);
-		//struct stat fstat, *sp;
+    struct dirent *dirp;
+    dp = opendir(dirname);
+    char dnamecpy[1024]; 
+    while ((dirp = readdir(dp)) != NULL){
+        sprintf(msg+strlen(msg),"%s", dirp->d_name);
+        strcpy(dnamecpy, dirname);
+        strcat(dnamecpy,"/");
+        strcat(dnamecpy, dirp->d_name);
+        if (dirp->d_type == DT_DIR) {
+            sprintf(msg+strlen(msg),"*");
+        }
+        sprintf(msg+strlen(msg),"\n");
+    }
+    closedir(dp);
 
-		sp = &fstat;
-		if ((r = lstat(dnamecpy, &fstat)) < 0) {
-			printf(msg, "No such file: %s\n",dirname);
-            DieWithError(msg);
-		}
-
-		if ((sp->st_mode & 0xF000) == 0x4000) // if S_ISDIR()
-			strcat(msg,"/");
-		// print name
-		strcat(msg, basename(dnamecpy));
-		strcat(msg,"\n");
-	}
-	closedir(dp);
-    strcat(msg, "\0");
+    sprintf(msg+strlen(msg), "\0");
     printf("sending contents to client\n");
-    printf("List %s", msg);
-    put(sock,msg, 4096);
+    put(sock,msg, DIR_SIZE);
+    awaitConfirmation(sock);
 }
 
-void getFileName(int sock, char *filename){
+void getFileName(int sock, char *filename) {
     unsigned char msg[255];
     memset(msg, 0, sizeof(msg));
     strcpy(msg, "Enter the name of the file to download:\n");
@@ -142,16 +132,37 @@ void getFileName(int sock, char *filename){
     printf("Client entered %s\n",filename);
 }
 
-void sendFile(int sock, char *filenameOut){
+void sendFileSize(int sock, char *filename) {
+    struct stat st;
+    if (stat(filename, &st) == -1) {
+        DieWithError("stat() failed");
+    }
+    long fileSize = st.st_size;
+    char fileSizeStr[32];
+    sprintf(fileSizeStr, "%ld", fileSize);
+    put(sock, fileSizeStr, sizeof(unsigned int));
+    awaitConfirmation(sock);
+}
+
+void sendFile(int sock, char *filenameOut) {
     printf("Attempting to send file %s\n", filenameOut);
     FILE *file = fopen(filenameOut, "rb");
     if(file == NULL)    
         DieWithError("fopen() failed");
     unsigned char buffer[RCVBUFSIZE];
     size_t bytesRead;
-    while ((bytesRead = fread(buffer, 1, sizeof(buffer), file)) > 0) {
+    while ((bytesRead = fread(buffer, 1, RCVBUFSIZE, file)) > 0) {
+        printf("%d bytes read", bytesRead);
         put(sock, buffer, bytesRead);
-    }
+    }   
     fclose(file);
-    printf("File %s sent\n", filenameOut);
+    printf("\nFile %s sent\nAwaiting confirmation from client\n", filenameOut);
+    awaitConfirmation(sock);
+}
+
+void awaitConfirmation(int sock) {
+    unsigned char msg[NAME_SIZE];
+    memset(msg, 0, NAME_SIZE);
+    get(sock, msg, NAME_SIZE);
+    printf("%s\n",msg);
 }

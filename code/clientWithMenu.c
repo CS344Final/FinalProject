@@ -7,17 +7,7 @@
 
 #define RCVBUFSIZE 100 /* Size of receive buffer */
 #define NAME_SIZE 255  /*Includes room for null */
-
-typedef struct {
-    unsigned int x;
-    unsigned int y;
-    unsigned char oper;
-} TRANS_DATA_TYPE;
-
-typedef struct {
-    unsigned int x;
-    unsigned int y;
-} DATA_TYPE;
+#define DIR_SIZE 9000
 
 struct menu {
     unsigned char line1[30];
@@ -33,7 +23,10 @@ unsigned int displayMenuAndSendSelection(int);
 void receiveDirList(int sock);
 void sendDirName(int, char *);
 void sendFilename(int, char *);
-void receiveFile(int, char *);
+void receiveFile(int, char *, unsigned int *);
+void sendConfirmation(int, char *);
+void getFileSize(int, unsigned int *);
+
 
 int main(int argc, char *argv[]) {
     int sock;                        /* Socket descriptor */
@@ -44,12 +37,7 @@ int main(int argc, char *argv[]) {
     unsigned int echoStringLen;      /* Length of string to echo */
     int bytesRcvd, totalBytesRcvd;   /* Bytes read in single recv()
                                        and total bytes read */
-    int answer;
-
-    DATA_TYPE data;
-    TRANS_DATA_TYPE incoming;
-    memset(&incoming, 0, sizeof(TRANS_DATA_TYPE));
-    
+    int answer;    
     /* Test for correct number of arguments */
     if ((argc < 2) || (argc > 3)) {
         fprintf(stderr, "Usage: %s <Server IP> [<Echo Port>]\n",
@@ -89,19 +77,22 @@ void talkToServer(int sock) {
     unsigned char bye[5];
     unsigned char fileName[NAME_SIZE];
     unsigned char dirName[NAME_SIZE];
+    unsigned int *fileSize;
+    *fileSize = 0;
 
     while (1)
     {
-        selection = displayMenuAndSendSelection(sock);
+        selection = displayMenuAndSendSelection(sock);      //receive + send input
         printf("Client selected: %d\n", selection);
-        switch (selection) { // we need to change sendName() and sendNumber()
+        switch (selection) {
         case 1:
-            sendDirName(sock, dirName);
-            receiveDirList(sock);
+            sendDirName(sock, dirName);                     //receive + send input
+            receiveDirList(sock);                           //receive + send confirm
             break;
         case 2:
-            sendFilename(sock, fileName);
-            receiveFile(sock, fileName);
+            sendFilename(sock, fileName);                   //receive + send input
+            getFileSize(sock, fileSize);                    //receive + send confirm
+            receiveFile(sock, fileName, fileSize);          //receive + send confirm
             break;
         }
         if (selection == 3)
@@ -144,9 +135,12 @@ void sendDirName(int sock, char *dirname) {
 }
 
 void receiveDirList(int sock) {
-    unsigned char dirList[4096];
-    get(sock,dirList, 4096);
+    printf("receiveDirList called\n");
+    unsigned char dirList[DIR_SIZE];
+    memset(dirList, 0, sizeof(dirList));
+    get(sock,dirList, DIR_SIZE);
     printf("%s\n",dirList);
+    sendConfirmation(sock, "Directory list");
 }
 
 void sendFilename(int sock, char *fileNameIn) {
@@ -161,32 +155,50 @@ void sendFilename(int sock, char *fileNameIn) {
     put(sock, fileNameIn, NAME_SIZE);
 }
 
-void receiveFile(int sock, char *filenameIn) {
+void getFileSize(int sock, unsigned int *size){
+    unsigned char fileSize[sizeof(unsigned int)];
+    memset(fileSize, 0, sizeof(unsigned int));
+    get(sock, fileSize, sizeof(fileSize));
+    *size = atoi(fileSize);
+    printf("File of size %u bytes ready to download\n",*size);
+    sendConfirmation(sock, "File size");
+}
+
+//sends a confirm message to server
+void sendConfirmation(int sock, char *dataName){
+    unsigned char msg[NAME_SIZE];
+    sprintf(msg, "%s was received by the client\n",dataName);
+    put(sock, msg, NAME_SIZE);
+    printf("Sent confirmation to the server.\n");
+}
+
+void receiveFile(int sock, char *filenameIn, unsigned int *fileSize) {
     unsigned char fileData[RCVBUFSIZE];
     printf("Attempting to receive file %s\n", filenameIn);
     FILE *file = fopen(filenameIn, "wb");
     if (file == NULL) {
         DieWithError("fopen() failed");
     }
+    printf("file %s opened\n",filenameIn);
 
     int totalBytesReceived = 0;
     int bytesReceived = 0;
-    while ((bytesReceived = recv(sock, fileData, RCVBUFSIZE, 0)) > 0) {
+    while (totalBytesReceived < *fileSize) {
+        bytesReceived = recv(sock, fileData, RCVBUFSIZE, 0);
+        if (bytesReceived <= 0) {
+            break;
+        }
         if (fwrite(fileData, 1, bytesReceived, file) != bytesReceived) {
             DieWithError("fwrite() failed");
         }
+        totalBytesReceived += bytesReceived;
+        printf("written: %s\n",fileData);
     }
-    if (bytesReceived < 0) {
-        DieWithError("recv() failed");
-    }
-    else if (bytesReceived == 0)
-        DieWithError("Connection closed prematurely");
-    totalBytesReceived += bytesReceived;
-
-    if (fwrite(fileData, 1, totalBytesReceived, file) != totalBytesReceived) {
-        DieWithError("fwrite() failed");
+    if (totalBytesReceived != *fileSize) {
+        DieWithError("File transfer incomplete");
     }
 
     fclose(file);
     printf("File %s received\n", filenameIn);
+    sendConfirmation(sock, "File");
 }
