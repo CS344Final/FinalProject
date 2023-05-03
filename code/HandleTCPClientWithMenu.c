@@ -8,7 +8,6 @@
 #include <libgen.h>
 #include <sys/types.h>
 
-
 #define RCVBUFSIZE 32   /* Size of receive buffer */
 #define NAME_SIZE 255 /*Includes room for null */
 
@@ -78,6 +77,7 @@ unsigned int sendMenuAndWaitForResponse(int clntSocket)
     get(clntSocket, &response, sizeof(unsigned int));
     return ntohl(response);
 }
+
 //gets dirname from user and stores it
 void getDirectoryName(int sock,char *dirname){
     unsigned char msg[255];
@@ -88,7 +88,7 @@ void getDirectoryName(int sock,char *dirname){
     get(sock,dirname, NAME_SIZE);
     printf("Client entered %s\n",dirname);
 }
-    
+ 
 void directoryListing(int sock, char *dirname) {
     printf("Attempting to list directory\n");
     struct stat mystat, *sp = &mystat;
@@ -140,7 +140,7 @@ void getFileName(int sock, char *filename){
 }
 
 void sendFile(int sock, char *filenameOut){
-    printf("Attempting to send file\n");
+    printf("Attempting to send file %s\n", filenameOut);
     FILE *file = fopen(filenameOut, "rb");
     if(file == NULL)    
         DieWithError("fopen() failed");
@@ -149,4 +149,12 @@ void sendFile(int sock, char *filenameOut){
     while ((bytesRead = fread(buffer, 1, sizeof(buffer), file)) > 0) {
         put(sock, buffer, bytesRead);
     }
+    fclose(file);
+    printf("File %s sent\n", filenameOut);
 }
+/*
+this project isn't getting finished. 
+I changed the menu and tried to add file transfer, 
+but it just makes a new file of the same name
+and doesn't transfer the contents. -jack
+*/
