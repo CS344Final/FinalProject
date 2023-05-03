@@ -111,7 +111,7 @@ void directoryListing(int sock, char *dirname) {
 		strcpy(dnamecpy, dirname);
 		strcat(dnamecpy, "/");
 		strcat(dnamecpy, dirp->d_name);
-		struct stat fstat, *sp;
+		//struct stat fstat, *sp;
 
 		sp = &fstat;
 		if ((r = lstat(dnamecpy, &fstat)) < 0) {
@@ -128,6 +128,7 @@ void directoryListing(int sock, char *dirname) {
 	closedir(dp);
     strcat(msg, "\0");
     printf("sending contents to client\n");
+    printf("List %s", msg);
     put(sock,msg, 4096);
 }
 

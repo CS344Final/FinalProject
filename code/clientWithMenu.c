@@ -144,7 +144,7 @@ void sendDirName(int sock, char *dirname) {
 }
 
 void receiveDirList(int sock) {
-    unsigned char dirList[4097];
+    unsigned char dirList[4096];
     get(sock,dirList, 4096);
     printf("%s\n",dirList);
 }
