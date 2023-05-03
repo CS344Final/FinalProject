@@ -23,15 +23,14 @@ void put(int, void *, unsigned int);
 
 unsigned int sendMenuAndWaitForResponse(int);
 
-//these functions should be changed for our purposes
 void getDirectoryName(int, char *);
 void directoryListing(int, char *);
 void getFileName(int, char *);
-void sendFile(int, char *); //this method is extended below
+void sendFile(int, char *);
 
+//this function is done
 void HandleTCPClient(int clntSocket)
 {
-    int recvMsgSize;                    /* Size of received message */
     unsigned int response = 0;
     char directoryName[NAME_SIZE]; //max length 20
     int number = 0;
@@ -43,7 +42,7 @@ void HandleTCPClient(int clntSocket)
     while(response != 3)
     {
         switch(response)
-        {       // here too we need functions for directory listing and selecting a file
+        {
             case 1: printf("Client selected 1.\n");
                     getDirectoryName(clntSocket,directoryName);
                     directoryListing(clntSocket, directoryName); 
@@ -55,7 +54,7 @@ void HandleTCPClient(int clntSocket)
             default: printf("Client selected junk.\n"); put(clntSocket, errorMsg, sizeof(errorMsg)); break;
         }
         response = sendMenuAndWaitForResponse(clntSocket);
-    }//end while
+    }
 
     put(clntSocket, bye, sizeof(bye));
 
@@ -94,39 +93,42 @@ void directoryListing(int sock, char *dirname) {
     struct stat mystat, *sp = &mystat;
     int r;
     char path[1024], cwd[1024], msg[4096];
+    *msg = "";
 
-    if ((r = lstat(dirname, sp)) < 0)
-	{
-        printf(msg, "No such file: %s\n",dirname);
-        DieWithError(msg);
-	}
 	strcpy(path, dirname);
-	if (path[0] != '/') // filename is relative
-    {
+	if (path[0] != '/') {// filename is relative
 		getcwd(cwd, 1024);
 		strcpy(path, cwd);
 		strcat(path, "/");
 		strcat(path, dirname);
 	}
-    
-    DIR *dir = fdopendir(path);
-    
-    if (dir == NULL) {
-        perror("fdopendir");
-        closedir(dir);
-    }
+    printf("path accquired: %s\n", path);
+    DIR *dp;
+	struct dirent *dirp;
+	dp = opendir(dirname);
+	char dnamecpy[1024];
+	while ((dirp = readdir(dp)) != NULL) {
+		strcpy(dnamecpy, dirname);
+		strcat(dnamecpy, "/");
+		strcat(dnamecpy, dirp->d_name);
+		struct stat fstat, *sp;
 
-    // Loop through the directory entries
-    struct dirent *entry;
-    while ((entry = readdir(dir)) != NULL) {
-        if (entry->d_type == DT_DIR)
-            strcat(msg,"/");
-        strcat(msg, entry->d_name);
-    }
+		sp = &fstat;
+		if ((r = lstat(dnamecpy, &fstat)) < 0) {
+			printf(msg, "No such file: %s\n",dirname);
+            DieWithError(msg);
+		}
 
-    // Close the directory
-    closedir(dir);
-    put(sock,msg, sizeof(msg));
+		if ((sp->st_mode & 0xF000) == 0x4000) // if S_ISDIR()
+			strcat(msg,"/");
+		// print name
+		strcat(msg, basename(dnamecpy));
+		strcat(msg,"\n");
+	}
+	closedir(dp);
+    strcat(msg, "\0");
+    printf("sending contents to client\n");
+    put(sock,msg, 4096);
 }
 
 void getFileName(int sock, char *filename){
@@ -152,9 +154,3 @@ void sendFile(int sock, char *filenameOut){
     fclose(file);
     printf("File %s sent\n", filenameOut);
 }
-/*
-this project isn't getting finished. 
-I changed the menu and tried to add file transfer, 
-but it just makes a new file of the same name
-and doesn't transfer the contents. -jack
-*/

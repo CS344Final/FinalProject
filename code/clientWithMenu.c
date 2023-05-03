@@ -8,21 +8,18 @@
 #define RCVBUFSIZE 100 /* Size of receive buffer */
 #define NAME_SIZE 255  /*Includes room for null */
 
-typedef struct
-{
+typedef struct {
     unsigned int x;
     unsigned int y;
     unsigned char oper;
 } TRANS_DATA_TYPE;
 
-typedef struct
-{
+typedef struct {
     unsigned int x;
     unsigned int y;
 } DATA_TYPE;
 
-struct menu
-{
+struct menu {
     unsigned char line1[30];
     unsigned char line2[30];
     unsigned char line3[30];
@@ -33,13 +30,12 @@ void get(int, void *, unsigned int);
 void put(int, void *, unsigned int);
 void talkToServer(int);
 unsigned int displayMenuAndSendSelection(int);
-// TODO: void receiveDirList(int sock);    needs to be implemented
+void receiveDirList(int sock);
 void sendDirName(int, char *);
 void sendFilename(int, char *);
 void receiveFile(int, char *);
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
     int sock;                        /* Socket descriptor */
     struct sockaddr_in echoServAddr; /* Echo server address */
     unsigned short echoServPort;     /* Echo server port */
@@ -54,8 +50,8 @@ int main(int argc, char *argv[])
     TRANS_DATA_TYPE incoming;
     memset(&incoming, 0, sizeof(TRANS_DATA_TYPE));
     
-    if ((argc < 2) || (argc > 3)) /* Test for correct number of arguments */
-    {
+    /* Test for correct number of arguments */
+    if ((argc < 2) || (argc > 3)) {
         fprintf(stderr, "Usage: %s <Server IP> [<Echo Port>]\n",
                 argv[0]);
         exit(1);
@@ -82,16 +78,13 @@ int main(int argc, char *argv[])
     if (connect(sock, (struct sockaddr *)&echoServAddr, sizeof(echoServAddr)) < 0)
         DieWithError("connect() failed");
 
-    // echoStringLen = strlen(echoString);          /* Determine input length */
-
     talkToServer(sock);
 
     close(sock);
     exit(0);
 }
 
-void talkToServer(int sock)
-{
+void talkToServer(int sock) {
     unsigned int selection = 0;
     unsigned char bye[5];
     unsigned char fileName[NAME_SIZE];
@@ -101,10 +94,10 @@ void talkToServer(int sock)
     {
         selection = displayMenuAndSendSelection(sock);
         printf("Client selected: %d\n", selection);
-        switch (selection)
-        { // we need to change sendName() and sendNumber()
+        switch (selection) { // we need to change sendName() and sendNumber()
         case 1:
             sendDirName(sock, dirName);
+            receiveDirList(sock);
             break;
         case 2:
             sendFilename(sock, fileName);
@@ -120,8 +113,7 @@ void talkToServer(int sock)
     printf("%s\n", bye);
 }
 
-unsigned int displayMenuAndSendSelection(int sock)
-{
+unsigned int displayMenuAndSendSelection(int sock) {
     struct menu menuBuffer; /* Buffer for echo string */
     unsigned int response = 0;
     unsigned int output;
@@ -139,8 +131,7 @@ unsigned int displayMenuAndSendSelection(int sock)
     return response;
 }
 
-void sendDirName(int sock, char *dirname)
-{
+void sendDirName(int sock, char *dirname) {
     unsigned char msg[255];
 
     memset(msg, 0, sizeof(msg));
@@ -148,11 +139,17 @@ void sendDirName(int sock, char *dirname)
     printf("%s\n", msg);
     memset(dirname, 0, NAME_SIZE);
     fgets(dirname, NAME_SIZE, stdin);
+    dirname[strcspn(dirname, "\n")] = 0;
     put(sock, dirname, NAME_SIZE);
 }
 
-void sendFilename(int sock, char *fileNameIn)
-{
+void receiveDirList(int sock) {
+    unsigned char dirList[4097];
+    get(sock,dirList, 4096);
+    printf("%s\n",dirList);
+}
+
+void sendFilename(int sock, char *fileNameIn) {
     unsigned char msg[255];
 
     memset(msg, 0, sizeof(msg));
@@ -164,35 +161,29 @@ void sendFilename(int sock, char *fileNameIn)
     put(sock, fileNameIn, NAME_SIZE);
 }
 
-void receiveFile(int sock, char *filenameIn)
-{
+void receiveFile(int sock, char *filenameIn) {
     unsigned char fileData[RCVBUFSIZE];
     printf("Attempting to receive file %s\n", filenameIn);
     FILE *file = fopen(filenameIn, "wb");
-    if (file == NULL)
-    {
+    if (file == NULL) {
         DieWithError("fopen() failed");
     }
 
     int totalBytesReceived = 0;
     int bytesReceived = 0;
-    while ((bytesReceived = recv(sock, fileData, RCVBUFSIZE, 0)) > 0)
-    {
-        if (fwrite(fileData, 1, bytesReceived, file) != bytesReceived)
-        {
+    while ((bytesReceived = recv(sock, fileData, RCVBUFSIZE, 0)) > 0) {
+        if (fwrite(fileData, 1, bytesReceived, file) != bytesReceived) {
             DieWithError("fwrite() failed");
         }
     }
-    if (bytesReceived < 0)
-    {
+    if (bytesReceived < 0) {
         DieWithError("recv() failed");
     }
     else if (bytesReceived == 0)
         DieWithError("Connection closed prematurely");
     totalBytesReceived += bytesReceived;
 
-    if (fwrite(fileData, 1, totalBytesReceived, file) != totalBytesReceived)
-    {
+    if (fwrite(fileData, 1, totalBytesReceived, file) != totalBytesReceived) {
         DieWithError("fwrite() failed");
     }
 
