@@ -27,8 +27,8 @@ unsigned int sendMenuAndWaitForResponse(int);
 void getDirectoryName(int, char *);
 void directoryListing(int, char *);
 void getFileName(int, char *);
-void sendFile(int, char *);
-void sendFileSize(int, char *);
+void sendFile(int, char *, long);
+long sendFileSize(int, char *);
 void awaitConfirmation(int);
 
 //this function is done
@@ -38,8 +38,9 @@ void HandleTCPClient(int clntSocket)
     char directoryName[NAME_SIZE]; //max length 20
     int number = 0;
     unsigned char errorMsg[] = "Invalid Choice";
-    unsigned char bye[] = "Bye!";
+    unsigned char bye[10] = "Bye!";
     unsigned char fileName[NAME_SIZE];  
+    long fileSize = 0;
 
     response = sendMenuAndWaitForResponse(clntSocket);      //send + receive input
     while(response != 3)
@@ -52,8 +53,8 @@ void HandleTCPClient(int clntSocket)
                     break;
             case 2: printf("Client selected 2.\n");
                     getFileName(clntSocket,fileName);               //send + receive input
-                    sendFileSize(clntSocket, fileName);             //send + receive confirm
-                    sendFile(clntSocket,fileName);                  //send + receive confirm
+                   fileSize = sendFileSize(clntSocket, fileName);             //send + receive confirm
+                    sendFile(clntSocket,fileName, fileSize);                  //send + receive confirm
                     break;
             default: printf("Client selected junk.\n"); put(clntSocket, errorMsg, sizeof(errorMsg)); break;
         }
@@ -132,7 +133,7 @@ void getFileName(int sock, char *filename) {
     printf("Client entered %s\n",filename);
 }
 
-void sendFileSize(int sock, char *filename) {
+long sendFileSize(int sock, char *filename) {
     struct stat st;
     if (stat(filename, &st) == -1) {
         DieWithError("stat() failed");
@@ -140,28 +141,28 @@ void sendFileSize(int sock, char *filename) {
     long fileSize = st.st_size;
     char fileSizeStr[32];
     sprintf(fileSizeStr, "%ld", fileSize);
-    put(sock, fileSizeStr, sizeof(unsigned int));
+    put(sock, fileSizeStr, sizeof(fileSizeStr));
     awaitConfirmation(sock);
+    printf("fileSize: %ld\n",fileSize);
+    return fileSize;
 }
 
-void sendFile(int sock, char *filenameOut) {
+void sendFile(int sock, char *filenameOut, long fileSize) {
     printf("Attempting to send file %s\n", filenameOut);
     FILE *file = fopen(filenameOut, "rb");
     if(file == NULL)    
         DieWithError("fopen() failed");
-    unsigned char buffer[RCVBUFSIZE];
-    size_t bytesRead;
-    while ((bytesRead = fread(buffer, 1, RCVBUFSIZE, file)) > 0) {
-        printf("%d bytes read", bytesRead);
-        put(sock, buffer, bytesRead);
-    }   
+    char *buffer = (char *)malloc(sizeof(char) * fileSize);
+    fread(buffer, 1, fileSize, file);
+    put(sock, buffer, fileSize);
     fclose(file);
     printf("\nFile %s sent\nAwaiting confirmation from client\n", filenameOut);
+    printf("%s\n", buffer);
     awaitConfirmation(sock);
 }
 
 void awaitConfirmation(int sock) {
-    unsigned char msg[NAME_SIZE];
+    char msg[NAME_SIZE];
     memset(msg, 0, NAME_SIZE);
     get(sock, msg, NAME_SIZE);
     printf("%s\n",msg);
